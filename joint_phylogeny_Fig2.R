@@ -1,3 +1,8 @@
+# Script for generating the joint phylogenetic tree on Figure 2 of Chacón-Duque et al. 2025
+# Requires: BEAST tree output and regions.txt file with sample metadata
+# Output: Annotated tree figures (PNG)
+
+# Load required libraries for data manipulation and tree visualization
 library(tidyverse)
 library(ape)
 library(ggtree)
@@ -5,26 +10,27 @@ library(treeio)
 library(tidytree)
 library(ggnewscale)
 
-#Reading BEAST tree output using library "treeio")
+# Read BEAST tree output (phylogenetic tree with posterior probabilities)
 beasttree <- read.beast("Chacon-Duque-2025.nodating.100M.combined.trees.out")
 
-#Reading files with additional information on the samples:
+# Read sample metadata (regions, tip labels, etc.)
 regions <- read.delim("regions.txt")
 
-##Using files with additional information to add it into the three and the plot
-regions$tip.label %in% beasttree@phylo$tip.label #this is just to check that the information matches
-beasttree@phylo$tip.label[!regions$tip.label %in% beasttree@phylo$tip.label] #and this to make sure that there's no missing data
+# Check that all tip labels in metadata are present in the tree
+regions$tip.label %in% beasttree@phylo$tip.label
+# and this to make sure that there's no missing data (list missing tips)
+beasttree@phylo$tip.label[!regions$tip.label %in% beasttree@phylo$tip.label]
 
-#Checking node labels in the full tree. (248 label is the one to exclude all elephants from the tree)
+# Visualize node labels to identify clades and nodes of interest
 ggtree(beasttree) + geom_text(aes(label=node), hjust=-.3)
 
-#excluding elephants from the tree (library tidytree is required for this)
+# Exclude elephant outgroup by subsetting tree at node 248
 treesub <- tree_subset(beasttree,248,levels_back = 0,root_edge=FALSE)
 
-#checking node labels
+# Re-check node labels after subsetting
 ggtree(treesub) + geom_text(aes(label=node), hjust=-.3)
 
-#This is to show posterior probability values only on some nodes (node numbers might change in different iterations of the tree)
+# List of nodes to annotate with posterior probabilities (update as needed)
 nodes <- c("226","227","228","229","230","381","432",
            "433","434","435","436","437","445","446","447",
            "448","449","382","383","384","385","386",
@@ -32,9 +38,9 @@ nodes <- c("226","227","228","229","230","381","432",
            "402","403","404","231","232","321","322",
            "323","380","326","327","325","351","352",
            "353","354","361","362","364","233","234",
-           "236","309","237","293","238") #node numbers change
+           "236","309","237","293","238")
 
-#to indicate which tips to highlight, needs to be modified to add more and to add names as well.
+# List of tips to highlight in the plot (update as needed)
 tips_to_highlight <- c("P037_M.tro_NAS_ND", "P035_M.tro_NAS_ND", 
                        "P045_M.sp_NAS_ND","P033_M.tro_NAS_ND",
                        "P043_M.pri_NAS_ND","L171_M.pri_NAS_ND",
@@ -48,13 +54,14 @@ tips_to_highlight <- c("P037_M.tro_NAS_ND", "P035_M.tro_NAS_ND",
 tips_to_plot <- c("P037_M.tro_NAS_ND","P035_M.tro_NAS_ND","P043_M.pri_NAS_ND",
                   "P045_M.sp_NAS_ND","P033_M.tro_NAS_ND")
 
-#this is to define colours by regions
+# Define color palette for regions
 cols <- c("Siberia" = "#d73027", "North America" = "#2166ac", "Europe" = "#5aae61")
 
-### test code (will become final plot)
-
+# Build the main tree plot with time axis, clade labels, and highlights
 test_plot <- ggtree(treesub) %>% flip(382, 432) %<+% regions + 
-  geom_vline(xintercept = -281000, colour= "#636363", linetype = "dashed", alpha=.5) +
+  # Add vertical line for population bottleneck
+  geom_vline(xintercept = -281000, colour= "#636363", linetype = "dashed", alpha=.5) + 
+  # Annotate and colour time periods (Pleistocene, etc.)
   annotate("text", x=-316000, y=180, label="Population bottleneck", angle=90, colour= "#636363") +
   annotate("rect", xmin = -122000, xmax = 4000, ymin = 0, ymax = 225, 
            fill='white', alpha = .3) +
@@ -77,6 +84,7 @@ bar_height95 = as.data.frame(height95) %>%
   bind_cols(select(test_plot$data, y))
 
 test_plot <- test_plot + 
+# Add 95% HPD bars for node ages
   geom_segment(aes(x=min, y=y, xend=max, yend=y), 
                data=bar_height95, 
                color="#969696",
@@ -84,6 +92,7 @@ test_plot <- test_plot +
                size = 2)
 
 test_plot <- test_plot + 
+  # Highlight selected tips and add region colors
   geom_tippoint(aes(subset=(label %in% tips_to_highlight),
                     color=Region), shape=17, size = 2) + 
   scale_colour_manual(values = cols) + 
@@ -104,6 +113,7 @@ test_plot <- test_plot +
                     breaks=c("(0.9,1]", "(0.7,0.9]", "(0,0.7]"), 
                     labels=c("Higher than 0.9","Between 0.7 and 0.9","Lower than 0.7"),
                     limits =c("(0.9,1]", "(0.7,0.9]", "(0,0.7]")) +
+  # Add clade labels
   geom_cladelabel(node=382, label="Clade 3", colour="#636363",
                   align=TRUE,offset=4000,offset.text=30000,hjust=0.5,angle=90) + 
   geom_cladelabel(node=432, label="Clade 2", colour="#636363",
